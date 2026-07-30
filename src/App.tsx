@@ -11,8 +11,10 @@ import { ChatOverlay } from './components/ChatOverlay';
 import { QRScannerModal } from './components/QRScannerModal';
 import { Transaction, ChatMessage } from './types/kivo';
 
+type TabType = 'assistant' | 'wallet' | 'portfolio' | 'history' | 'profile';
+
 export function App() {
-  const [activeTab, setActiveTab] = useState<'assistant' | 'wallet' | 'history' | 'profile'>('assistant');
+  const [activeTab, setActiveTab] = useState<TabType>('assistant');
   const [showQRScanner, setShowQRScanner] = useState<boolean>(false);
 
   // Initialize initial transactions
@@ -220,6 +222,12 @@ export function App() {
         {activeTab === 'wallet' && (
           <div className="w-full">
             <WalletView transactions={transactions} onSendTx={handleSendTx} />
+          </div>
+        )}
+
+        {activeTab === 'portfolio' && (
+          <div className="w-full">
+            <PortfolioView transactions={transactions} />
           </div>
         )}
 

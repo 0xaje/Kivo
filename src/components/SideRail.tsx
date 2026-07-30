@@ -2,14 +2,15 @@ import React from 'react';
 import { MessageSquare, Wallet, History, User } from 'lucide-react';
 
 interface SideRailProps {
-  activeTab: 'assistant' | 'wallet' | 'history' | 'profile';
-  setActiveTab: (tab: 'assistant' | 'wallet' | 'history' | 'profile') => void;
+  activeTab: 'assistant' | 'wallet' | 'portfolio' | 'history' | 'profile';
+  setActiveTab: (tab: 'assistant' | 'wallet' | 'portfolio' | 'history' | 'profile') => void;
 }
 
 export const SideRail: React.FC<SideRailProps> = ({ activeTab, setActiveTab }) => {
   const items = [
     { id: 'assistant' as const, label: 'Assistant', icon: MessageSquare },
     { id: 'wallet' as const, label: 'Wallet', icon: Wallet },
+    { id: 'portfolio' as const, label: 'Portfolio', icon: Wallet },
     { id: 'history' as const, label: 'History', icon: History },
     { id: 'profile' as const, label: 'Profile', icon: User },
   ];
