@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { SideRail } from './components/SideRail';
-import { OrbCanvas } from './components/OrbCanvas';
 import { ShaderBackground } from './components/ShaderBackground';
 import { AssistantShell } from './components/AssistantShell';
 import { WalletView } from './components/WalletView';
@@ -9,14 +8,14 @@ import { PortfolioView } from './components/PortfolioView';
 import { HistoryView } from './components/HistoryView';
 import { ProfileView } from './components/ProfileView';
 import { ChatOverlay } from './components/ChatOverlay';
+import { QRScannerModal } from './components/QRScannerModal';
 import { Transaction, ChatMessage } from './types/kivo';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<'assistant' | 'wallet' | 'history' | 'profile'>('assistant');
-  const [orbStatus, setOrbStatus] = useState<'idle' | 'computing' | 'success'>('idle');
-  const [showSendModalFromChat, setShowSendModalFromChat] = useState<boolean>(false);
+  const [showQRScanner, setShowQRScanner] = useState<boolean>(false);
 
-  // Real transaction ledger state initialized from localStorage
+  // Initialize initial transactions
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('kivo_transactions');
     if (saved) {
@@ -24,41 +23,61 @@ export function App() {
     }
     return [
       {
-        id: 'tx-101',
+        id: 'tx-201',
         type: 'send',
-        recipientOrSender: '0x89205A3A3b2A69De6Dbf7f01ED13B2108B2c43e7',
-        amount: 0.15,
-        currency: 'ETH',
-        timestamp: new Date(Date.now() - 3600000).toLocaleTimeString(),
+        recipientOrSender: 'Digital Nomad Coffee',
+        amount: 50.0,
+        currency: 'NIM',
+        timestamp: '12 seconds ago',
         status: 'completed',
-        hash: '0xe7c8a91b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f',
+        hash: '0xf8e7d6c5b4a3928170192837465f4e3d2c1b0a',
+        category: 'Coffee & Daily Expense',
       },
       {
-        id: 'tx-100',
+        id: 'tx-200',
         type: 'receive',
-        recipientOrSender: '0x3C44CdD4596942666A3186595808293d052B34c4',
-        amount: 1.25,
-        currency: 'ETH',
-        timestamp: new Date(Date.now() - 86400000).toLocaleTimeString(),
+        recipientOrSender: 'Vault Deposit',
+        amount: 12.0,
+        currency: 'NIM',
+        timestamp: 'Yesterday',
         status: 'completed',
-        hash: '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b',
+        hash: '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a',
       },
     ];
   });
 
-  // Save transaction ledger on change
   useEffect(() => {
     localStorage.setItem('kivo_transactions', JSON.stringify(transactions));
   }, [transactions]);
 
-  // Chat message stream state
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Initial feed messages based on the KIVO stewardship design template
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'msg-1',
+      sender: 'kivo',
+      text: 'Good morning. Your digital assets are secure. You have 245.32 NIM available in your primary vault.',
+      timestamp: 'Just Now',
+    },
+    {
+      id: 'msg-2',
+      sender: 'kivo',
+      text: 'Vault Balance Summary:',
+      timestamp: 'Just Now',
+      actionCard: 'balance_card',
+    },
+    {
+      id: 'msg-3',
+      sender: 'kivo',
+      text: 'I noticed your last transaction of 50 NIM to the "Digital Nomad Coffee" address. This was a direct peer-to-peer transfer that confirmed in approximately 12 seconds. No additional fees were incurred on this network path. Would you like me to categorize this as a daily expense or set up a recurring trust for this wallet?',
+      timestamp: 'Just Now',
+      chips: [
+        { label: 'Categorize Expense', action: 'categorize' },
+        { label: 'Setup Recurring', action: 'recurring' },
+      ],
+    },
+  ]);
 
-  // Execute Web Crypto SHA-256 signed payment transaction
   const handleSendTx = async (recipient: string, amount: number, currency: string): Promise<Transaction> => {
-    setOrbStatus('computing');
-
-    // Compute real Web Crypto SHA-256 digest hash for transaction payload
     const payload = `${recipient}-${amount}-${currency}-${Date.now()}`;
     const encoder = new TextEncoder();
     const data = encoder.encode(payload);
@@ -78,16 +97,21 @@ export function App() {
     };
 
     setTransactions((prev) => [newTx, ...prev]);
-    setOrbStatus('success');
 
-    setTimeout(() => {
-      setOrbStatus('idle');
-    }, 2500);
+    // Push notification to message feed
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender: 'kivo',
+        text: `Transaction of ${amount} ${currency} to ${recipient} has been verified and confirmed. SHA-256 Hash: ${hashHex.substring(0, 14)}...`,
+        timestamp: new Date().toLocaleTimeString(),
+      },
+    ]);
 
     return newTx;
   };
 
-  // Process user assistant message or query
   const handleUserMessage = (text: string) => {
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -97,45 +121,74 @@ export function App() {
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setOrbStatus('computing');
 
     const lower = text.toLowerCase();
     setTimeout(() => {
-      let botResponseText = '';
+      let responseText = '';
       let actionCard: ChatMessage['actionCard'] = undefined;
+      let chips: ChatMessage['chips'] = undefined;
 
       if (lower.includes('balance') || lower.includes('show balance')) {
-        botResponseText = 'Here is your current verified wallet balance and asset valuation.';
-        actionCard = 'show_balance';
-      } else if (lower.includes('send') || lower.includes('transfer') || lower.includes('pay')) {
-        botResponseText = 'I can help you send funds with SHA-256 Web Crypto signatures. Click below to proceed.';
-        actionCard = 'send_money';
+        responseText = 'Here is your active vault balance overview:';
+        actionCard = 'balance_card';
+      } else if (lower.includes('send') || lower.includes('pay') || lower.includes('transfer')) {
+        responseText = 'Opening the Web Crypto signed transfer window for your transaction.';
+        setActiveTab('wallet');
       } else if (lower.includes('portfolio') || lower.includes('holdings')) {
-        botResponseText = 'Here is your current aggregate crypto portfolio breakdown.';
-        actionCard = 'portfolio';
+        responseText = 'Displaying your aggregate crypto holdings and live price telemetry.';
+        setActiveTab('wallet');
       } else {
-        botResponseText = `I have analyzed your request: "${text}". How would you like to proceed with your wallet stewardship?`;
+        responseText = `I have logged your request: "${text}". Your primary vault assets remain fully secured.`;
+        chips = [
+          { label: 'Categorize Expense', action: 'categorize' },
+          { label: 'Setup Recurring', action: 'recurring' },
+        ];
       }
 
-      const botMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        sender: 'kivo',
-        text: botResponseText,
-        timestamp: new Date().toLocaleTimeString(),
-        actionCard,
-      };
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          sender: 'kivo',
+          text: responseText,
+          timestamp: new Date().toLocaleTimeString(),
+          actionCard,
+          chips,
+        },
+      ]);
+    }, 600);
+  };
 
-      setMessages((prev) => [...prev, botMsg]);
-      setOrbStatus('idle');
-    }, 800);
+  const handleCategorizeExpense = (category: string) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender: 'kivo',
+        text: `Expense successfully categorized under "${category}". Transaction metadata updated.`,
+        timestamp: new Date().toLocaleTimeString(),
+      },
+    ]);
+  };
+
+  const handleSetupRecurring = () => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender: 'kivo',
+        text: 'Recurring trust scheduled for "Digital Nomad Coffee". Next auto-execution set for 7 days.',
+        timestamp: new Date().toLocaleTimeString(),
+      },
+    ]);
   };
 
   return (
-    <div className="relative min-h-screen bg-[#0f141a] text-slate-100 selection:bg-[#fcc82c]/30 selection:text-[#fcc82c] overflow-x-hidden font-sans">
-      {/* GLSL WebGL Obsidian Gold Wave Shader Background */}
+    <div className="relative min-h-screen bg-[#0f141a] text-[#dee2ec] selection:bg-[#fcc82c]/30 selection:text-[#fcc82c] overflow-x-hidden font-sans">
+      {/* Background GLSL WebGL Shader */}
       <ShaderBackground />
 
-      {/* Header Navigation */}
+      {/* Header Bar */}
       <Header
         onSearchQuery={(q) => handleUserMessage(q)}
         onOpenProfile={() => setActiveTab('profile')}
@@ -144,74 +197,26 @@ export function App() {
       {/* Side Rail Navigation */}
       <SideRail activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {/* Main Workspace Area */}
-      <main className="relative z-10 pt-20 px-6 max-w-6xl mx-auto min-h-screen flex flex-col items-center">
+      {/* Main Content Workspace */}
+      <main className="relative z-10 pt-20 px-4 md:px-6 max-w-4xl mx-auto min-h-screen flex flex-col items-center">
         {activeTab === 'assistant' && (
-          <div className="w-full flex flex-col items-center">
-            {/* Kivo 3D Intelligence Orb */}
-            <div className="relative w-full max-w-[360px] aspect-square my-2">
-              <OrbCanvas status={orbStatus} />
-            </div>
+          <div className="w-full">
+            <ChatOverlay
+              messages={messages}
+              transactions={transactions}
+              onTriggerSendModal={() => setActiveTab('wallet')}
+              onOpenTab={(tab) => setActiveTab(tab as any)}
+              onCategorizeExpense={handleCategorizeExpense}
+              onSetupRecurring={handleSetupRecurring}
+            />
 
-            {/* Hero Greeting Cluster */}
-            {messages.length === 0 && (
-              <div className="text-center space-y-2 mb-8 z-10">
-                <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white">
-                  Good Evening <br />
-                  <span className="text-[#fcc82c]">I'm KIVO.</span>
-                </h1>
-                <p className="text-slate-400 text-sm">How can I help you today?</p>
-              </div>
-            )}
-
-            {/* Quick Suggestion Chips */}
-            {messages.length === 0 && (
-              <div className="w-full max-w-2xl overflow-x-auto no-scrollbar mb-8">
-                <div className="flex items-center justify-center gap-3 whitespace-nowrap px-4">
-                  <button
-                    onClick={() => handleUserMessage('I want to send money')}
-                    className="px-5 py-2.5 rounded-full bg-[#252a32]/60 border border-white/5 backdrop-blur-md text-slate-300 hover:text-[#fcc82c] hover:border-[#fcc82c]/30 hover:bg-[#30353d] transition-all cursor-pointer text-xs font-semibold uppercase tracking-wider"
-                  >
-                    Send money
-                  </button>
-                  <button
-                    onClick={() => handleUserMessage('Request payment')}
-                    className="px-5 py-2.5 rounded-full bg-[#252a32]/60 border border-white/5 backdrop-blur-md text-slate-300 hover:text-[#fcc82c] hover:border-[#fcc82c]/30 hover:bg-[#30353d] transition-all cursor-pointer text-xs font-semibold uppercase tracking-wider"
-                  >
-                    Request payment
-                  </button>
-                  <button
-                    onClick={() => handleUserMessage('Show my portfolio')}
-                    className="px-5 py-2.5 rounded-full bg-[#252a32]/60 border border-white/5 backdrop-blur-md text-slate-300 hover:text-[#fcc82c] hover:border-[#fcc82c]/30 hover:bg-[#30353d] transition-all cursor-pointer text-xs font-semibold uppercase tracking-wider"
-                  >
-                    Portfolio
-                  </button>
-                  <button
-                    onClick={() => handleUserMessage('Show balance')}
-                    className="px-5 py-2.5 rounded-full bg-[#252a32]/60 border border-white/5 backdrop-blur-md text-slate-300 hover:text-[#fcc82c] hover:border-[#fcc82c]/30 hover:bg-[#30353d] transition-all cursor-pointer text-xs font-semibold uppercase tracking-wider"
-                  >
-                    Show balance
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Chat Stream View */}
-            {messages.length > 0 && (
-              <ChatOverlay
-                messages={messages}
-                transactions={transactions}
-                onTriggerSendModal={() => setActiveTab('wallet')}
-                onOpenTab={(tab) => setActiveTab(tab as any)}
-              />
-            )}
-
-            {/* Bottom Glassmorphic Input Shell */}
-            <AssistantShell onSendMessage={handleUserMessage} />
+            <AssistantShell
+              onSendMessage={handleUserMessage}
+              onOpenQRScanner={() => setShowQRScanner(true)}
+            />
           </div>
         )}
 
-        {/* Other Active Tab Views */}
         {activeTab === 'wallet' && (
           <div className="w-full">
             <WalletView transactions={transactions} onSendTx={handleSendTx} />
@@ -230,6 +235,17 @@ export function App() {
           </div>
         )}
       </main>
+
+      {/* QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScannerModal
+          onClose={() => setShowQRScanner(false)}
+          onScanResult={(addr) => {
+            setActiveTab('wallet');
+            handleUserMessage(`Scanned recipient address: ${addr}`);
+          }}
+        />
+      )}
     </div>
   );
 }

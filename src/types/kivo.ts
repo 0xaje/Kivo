@@ -7,6 +7,8 @@ export interface Transaction {
   timestamp: string;
   status: 'completed' | 'pending' | 'failed';
   hash: string;
+  category?: string;
+  isRecurring?: boolean;
 }
 
 export interface CryptoAsset {
@@ -20,9 +22,10 @@ export interface CryptoAsset {
 
 export interface ChatMessage {
   id: string;
-  sender: 'user' | 'kivo';
+  sender: 'user' | 'kivo' | 'system';
   text: string;
   timestamp: string;
-  actionCard?: 'send_money' | 'request_payment' | 'portfolio' | 'show_balance' | 'wallet_details';
+  actionCard?: 'balance_card' | 'streaming_response' | 'send_money' | 'portfolio';
   actionData?: any;
+  chips?: { label: string; action: string; icon?: string }[];
 }

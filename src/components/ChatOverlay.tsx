@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChatMessage, Transaction } from '../types/kivo';
-import { Wallet, Send, ArrowUpRight, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Wallet, Send, ArrowDownLeft, History, TrendingUp, Sparkles, Repeat, Tag } from 'lucide-react';
 
 interface ChatOverlayProps {
   messages: ChatMessage[];
   transactions: Transaction[];
-  onTriggerSendModal?: () => void;
-  onOpenTab?: (tab: 'wallet' | 'portfolio' | 'history') => void;
+  onTriggerSendModal: () => void;
+  onOpenTab: (tab: 'wallet' | 'portfolio' | 'history') => void;
+  onCategorizeExpense?: (category: string) => void;
+  onSetupRecurring?: () => void;
 }
 
 export const ChatOverlay: React.FC<ChatOverlayProps> = ({
@@ -14,91 +16,109 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
   transactions,
   onTriggerSendModal,
   onOpenTab,
+  onCategorizeExpense,
+  onSetupRecurring,
 }) => {
-  const totalEth = 4.85 - transactions.filter((t) => t.type === 'send').reduce((acc, t) => acc + t.amount, 0);
-
   return (
-    <div className="space-y-4 max-w-2xl mx-auto w-full pb-32">
+    <div className="space-y-6 max-w-2xl mx-auto w-full pb-36">
       {messages.map((msg) => (
-        <div
-          key={msg.id}
-          className={`flex flex-col ${
-            msg.sender === 'user' ? 'items-end' : 'items-start'
-          }`}
-        >
+        <div key={msg.id} className="space-y-3">
+          {/* Header Tag for System / Intelligence */}
+          {msg.sender !== 'user' && (
+            <div className="flex items-center gap-2 px-1 text-xs text-slate-400 font-medium">
+              <Sparkles className="w-4 h-4 text-[#fcc82c]" />
+              <span>Kivo Intelligence</span>
+            </div>
+          )}
+
+          {/* User or Bot Bubble */}
           <div
-            className={`max-w-[85%] rounded-2xl px-5 py-3.5 text-sm shadow-xl ${
-              msg.sender === 'user'
-                ? 'bg-amber-400 text-slate-950 font-medium rounded-br-none'
-                : 'bg-[#1a1f26]/90 backdrop-blur-xl border border-white/10 text-white rounded-bl-none'
+            className={`flex flex-col ${
+              msg.sender === 'user' ? 'items-end' : 'items-start'
             }`}
           >
-            <div>{msg.text}</div>
             <div
-              className={`text-[10px] mt-1 font-mono ${
-                msg.sender === 'user' ? 'text-slate-900/60' : 'text-slate-500'
+              className={`max-w-[90%] rounded-3xl p-5 text-sm leading-relaxed shadow-xl ${
+                msg.sender === 'user'
+                  ? 'bg-[#fcc82c] text-slate-950 font-semibold rounded-br-none'
+                  : 'bg-[#1a1f26]/80 backdrop-blur-2xl border border-white/10 text-slate-100 rounded-bl-none border-l-2 border-l-[#fcc82c]/40'
               }`}
             >
-              {msg.timestamp}
+              {msg.sender === 'kivo' ? (
+                <TypewriterText text={msg.text} />
+              ) : (
+                <div>{msg.text}</div>
+              )}
             </div>
 
-            {/* Render Action Cards */}
-            {msg.sender === 'kivo' && msg.actionCard === 'show_balance' && (
-              <div className="mt-3 p-4 rounded-xl bg-slate-950/80 border border-amber-400/30 text-white space-y-2">
-                <div className="flex items-center justify-between text-xs text-amber-400 font-semibold">
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" /> Verified Wallet Vault
-                  </span>
-                  <span>Active</span>
+            {/* Interactive Action Cards */}
+            {msg.sender === 'kivo' && msg.actionCard === 'balance_card' && (
+              <div className="w-full mt-3 bg-[#1a1f26]/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 shadow-2xl relative overflow-hidden space-y-5">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-xs uppercase tracking-widest text-[#fcc82c] font-semibold block mb-1">
+                      Current Vault Balance
+                    </span>
+                    <h2 className="text-3xl font-bold font-mono text-white flex items-baseline gap-2">
+                      245.32 <span className="text-sm font-sans text-slate-400">NIM</span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                      <TrendingUp className="w-3.5 h-3.5 text-[#fcc82c]" />
+                      You received 12 NIM yesterday.
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-[#fcc82c]">
+                    <Wallet className="w-6 h-6" />
+                  </div>
                 </div>
-                <div className="text-2xl font-bold font-mono text-white">
-                  {totalEth.toFixed(4)} ETH
+
+                {/* Quick Actions */}
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={onTriggerSendModal}
+                    className="py-3 rounded-xl bg-[#fcc82c] text-slate-950 font-semibold text-xs flex flex-col items-center gap-1 active:scale-95 transition-all hover:bg-amber-300 cursor-pointer"
+                  >
+                    <Send className="w-4 h-4" />
+                    Send
+                  </button>
+                  <button
+                    onClick={() => onOpenTab('wallet')}
+                    className="py-3 rounded-xl bg-slate-800 text-white font-semibold text-xs flex flex-col items-center gap-1 active:scale-95 transition-all hover:bg-slate-700 cursor-pointer"
+                  >
+                    <ArrowDownLeft className="w-4 h-4 text-[#fcc82c]" />
+                    Receive
+                  </button>
+                  <button
+                    onClick={() => onOpenTab('history')}
+                    className="py-3 rounded-xl bg-slate-800 text-white font-semibold text-xs flex flex-col items-center gap-1 active:scale-95 transition-all hover:bg-slate-700 cursor-pointer"
+                  >
+                    <History className="w-4 h-4 text-[#fcc82c]" />
+                    History
+                  </button>
                 </div>
-                <div className="text-xs text-slate-400">
-                  Total USD Value: ${(totalEth * 3450).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </div>
-                <button
-                  onClick={() => onOpenTab && onOpenTab('wallet')}
-                  className="w-full mt-2 py-2 rounded-lg bg-amber-400 text-slate-950 font-semibold text-xs flex items-center justify-center gap-1 cursor-pointer hover:bg-amber-300"
-                >
-                  <Wallet className="w-3.5 h-3.5" />
-                  View Full Wallet
-                </button>
               </div>
             )}
 
-            {msg.sender === 'kivo' && msg.actionCard === 'send_money' && (
-              <div className="mt-3 p-4 rounded-xl bg-slate-950/80 border border-amber-400/30 text-white space-y-2">
-                <div className="text-xs font-semibold text-amber-400 flex items-center gap-1">
-                  <Send className="w-3.5 h-3.5" /> Ready to Execute Transfer
-                </div>
-                <p className="text-xs text-slate-300">
-                  Click below to open the secure cryptographic payment interface with SHA-256 signatures.
-                </p>
-                <button
-                  onClick={onTriggerSendModal}
-                  className="w-full mt-2 py-2 rounded-lg bg-[#fcc82c] text-slate-950 font-semibold text-xs flex items-center justify-center gap-1 cursor-pointer hover:bg-amber-300"
-                >
-                  <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                  Open Payment Transfer Modal
-                </button>
-              </div>
-            )}
-
-            {msg.sender === 'kivo' && msg.actionCard === 'portfolio' && (
-              <div className="mt-3 p-4 rounded-xl bg-slate-950/80 border border-amber-400/30 text-white space-y-2">
-                <div className="text-xs font-semibold text-amber-400">Portfolio Breakdown Summary</div>
-                <div className="space-y-1 text-xs font-mono text-slate-300">
-                  <div className="flex justify-between"><span>ETH Holding:</span><span>4.85 ETH</span></div>
-                  <div className="flex justify-between"><span>WBTC Holding:</span><span>0.12 WBTC</span></div>
-                  <div className="flex justify-between"><span>SOL Holding:</span><span>45.0 SOL</span></div>
-                </div>
-                <button
-                  onClick={() => onOpenTab && onOpenTab('portfolio')}
-                  className="w-full mt-2 py-2 rounded-lg bg-amber-400 text-slate-950 font-semibold text-xs flex items-center justify-center gap-1 cursor-pointer hover:bg-amber-300"
-                >
-                  Inspect Live Portfolio
-                </button>
+            {/* Action Chips */}
+            {msg.chips && msg.chips.length > 0 && (
+              <div className="flex gap-2 flex-wrap mt-3">
+                {msg.chips.map((chip, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      if (chip.action === 'categorize' && onCategorizeExpense) {
+                        onCategorizeExpense('Coffee & Daily Expense');
+                      } else if (chip.action === 'recurring' && onSetupRecurring) {
+                        onSetupRecurring();
+                      }
+                    }}
+                    className="px-4 py-2 rounded-full bg-[#1a1f26]/80 backdrop-blur-md border border-[#fcc82c]/30 text-xs font-semibold text-white flex items-center gap-2 hover:bg-white/10 active:scale-95 transition-transform cursor-pointer"
+                  >
+                    {chip.action === 'categorize' && <Tag className="w-3.5 h-3.5 text-[#fcc82c]" />}
+                    {chip.action === 'recurring' && <Repeat className="w-3.5 h-3.5 text-[#fcc82c]" />}
+                    <span className="uppercase tracking-wider text-[10px]">{chip.label}</span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -106,4 +126,26 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
       ))}
     </div>
   );
+};
+
+// Typewriter Text Effect Sub-component
+const TypewriterText: React.FC<{ text: string }> = ({ text }) => {
+  const [displayedText, setDisplayedText] = useState<string>('');
+
+  useEffect(() => {
+    let index = 0;
+    const speed = 18; // ms per character
+    const interval = setInterval(() => {
+      if (index <= text.length) {
+        setDisplayedText(text.slice(0, index));
+        index++;
+      } else {
+        clearInterval(interval);
+      }
+    }, speed);
+
+    return () => clearInterval(interval);
+  }, [text]);
+
+  return <div>{displayedText}</div>;
 };
