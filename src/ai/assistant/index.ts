@@ -3,10 +3,10 @@
  * @description High-level Assistant orchestrator facade orchestrating router, memory, tools, and LLM providers.
  */
 
-import { LLMMessage, LLMResponse, AIExecutionContext, LLMStreamChunk } from '../types';
+import { LLMMessage, AIExecutionContext, LLMStreamChunk } from '../types';
 import { IProviderRegistry } from '../providers';
 import { IToolRegistry } from '../tools';
-import { IIntentRouter } from '../router';
+import { IIntentRouter, IntentType } from '../router';
 import { IAgentSupervisor } from '../agents';
 import { IMemoryProvider } from '../memory';
 import { IPromptManager } from '../prompts';
@@ -27,7 +27,7 @@ export interface AssistantQueryOptions {
  */
 export interface AssistantQueryResult {
   response: LLMMessage;
-  intentDomain?: string;
+  intentType?: IntentType;
   agentId?: string;
   executedTools?: string[];
   executionTimeMs: number;
@@ -91,7 +91,7 @@ export class KivoAIAssistant implements IAIAssistant {
 
     // 5. Delegate to Specialized Agent via AgentSupervisor
     const agentResult = await this.deps.agentSupervisor.delegateTask(
-      classified.domain,
+      classified.intent,
       history,
       options.context
     );
@@ -101,7 +101,7 @@ export class KivoAIAssistant implements IAIAssistant {
 
     return {
       response: agentResult.responseMessage,
-      intentDomain: classified.domain,
+      intentType: classified.intent,
       agentId: agentResult.agentId,
       executedTools: agentResult.toolsExecuted?.map((t) => t.toolName),
       executionTimeMs: Date.now() - startTime,

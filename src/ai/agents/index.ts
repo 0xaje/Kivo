@@ -3,8 +3,8 @@
  * @description Autonomous Agent interfaces, execution state machines, and supervisor delegation contracts.
  */
 
-import { LLMMessage, LLMResponse, AIExecutionContext } from '../types';
-import { IntentDomain } from '../router';
+import { LLMMessage, AIExecutionContext } from '../types';
+import { IntentType } from '../router';
 import { IAITool } from '../tools';
 
 /**
@@ -42,7 +42,7 @@ export interface IAgent {
   /**
    * Primary domain this agent specializes in.
    */
-  readonly primaryDomain: IntentDomain;
+  readonly primaryDomain: IntentType;
 
   /**
    * List of tool capabilities bound to this agent.
@@ -66,7 +66,7 @@ export interface IAgentSupervisor {
   getAgent(agentId: string): IAgent | undefined;
   listAgents(): IAgent[];
   delegateTask(
-    domain: IntentDomain,
+    intent: IntentType,
     messages: LLMMessage[],
     context: AIExecutionContext
   ): Promise<AgentExecutionResult>;
@@ -77,11 +77,11 @@ export interface IAgentSupervisor {
  */
 export class AgentSupervisor implements IAgentSupervisor {
   private agents = new Map<string, IAgent>();
-  private domainMap = new Map<IntentDomain, IAgent>();
+  private intentMap = new Map<IntentType, IAgent>();
 
   public registerAgent(agent: IAgent): void {
     this.agents.set(agent.agentId, agent);
-    this.domainMap.set(agent.primaryDomain, agent);
+    this.intentMap.set(agent.primaryDomain, agent);
   }
 
   public getAgent(agentId: string): IAgent | undefined {
@@ -93,13 +93,13 @@ export class AgentSupervisor implements IAgentSupervisor {
   }
 
   public async delegateTask(
-    domain: IntentDomain,
+    intent: IntentType,
     messages: LLMMessage[],
     context: AIExecutionContext
   ): Promise<AgentExecutionResult> {
-    const targetAgent = this.domainMap.get(domain);
+    const targetAgent = this.intentMap.get(intent);
     if (!targetAgent) {
-      throw new Error(`No specialized agent registered for domain "${domain}".`);
+      throw new Error(`No specialized agent registered for intent "${intent}".`);
     }
     return await targetAgent.executeTask(messages, context);
   }
