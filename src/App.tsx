@@ -9,15 +9,20 @@ import { HistoryView } from './components/HistoryView';
 import { ProfileView } from './components/ProfileView';
 import { ChatOverlay } from './components/ChatOverlay';
 import { QRScannerModal } from './components/QRScannerModal';
+import { SendPaymentCheckout } from './components/SendPaymentCheckout';
 import { Transaction, ChatMessage } from './types/kivo';
 
-type TabType = 'assistant' | 'wallet' | 'portfolio' | 'history' | 'profile';
+type TabType = 'assistant' | 'wallet' | 'portfolio' | 'history' | 'profile' | 'checkout';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<TabType>('assistant');
   const [showQRScanner, setShowQRScanner] = useState<boolean>(false);
+  const [checkoutData, setCheckoutData] = useState<{ recipient: string; amount: number; currency: string }>({
+    recipient: 'David',
+    amount: 25,
+    currency: 'NIM',
+  });
 
-  // Initialize initial transactions
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('kivo_transactions');
     if (saved) {
@@ -52,7 +57,6 @@ export function App() {
     localStorage.setItem('kivo_transactions', JSON.stringify(transactions));
   }, [transactions]);
 
-  // Initial feed messages based on the KIVO stewardship design template
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'msg-1',
@@ -100,13 +104,12 @@ export function App() {
 
     setTransactions((prev) => [newTx, ...prev]);
 
-    // Push notification to message feed
     setMessages((prev) => [
       ...prev,
       {
         id: Date.now().toString(),
         sender: 'kivo',
-        text: `Transaction of ${amount} ${currency} to ${recipient} has been verified and confirmed. SHA-256 Hash: ${hashHex.substring(0, 14)}...`,
+        text: `Confirmed payment of ${amount} ${currency} to ${recipient}. SHA-256 Hash: ${hashHex.substring(0, 14)}...`,
         timestamp: new Date().toLocaleTimeString(),
       },
     ]);
@@ -134,11 +137,11 @@ export function App() {
         responseText = 'Here is your active vault balance overview:';
         actionCard = 'balance_card';
       } else if (lower.includes('send') || lower.includes('pay') || lower.includes('transfer')) {
-        responseText = 'Opening the Web Crypto signed transfer window for your transaction.';
-        setActiveTab('wallet');
+        responseText = 'Opening the KIVO Payment Checkout screen for your transaction.';
+        setActiveTab('checkout');
       } else if (lower.includes('portfolio') || lower.includes('holdings')) {
         responseText = 'Displaying your aggregate crypto holdings and live price telemetry.';
-        setActiveTab('wallet');
+        setActiveTab('portfolio');
       } else {
         responseText = `I have logged your request: "${text}". Your primary vault assets remain fully secured.`;
         chips = [
@@ -161,60 +164,66 @@ export function App() {
     }, 600);
   };
 
-  const handleCategorizeExpense = (category: string) => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        sender: 'kivo',
-        text: `Expense successfully categorized under "${category}". Transaction metadata updated.`,
-        timestamp: new Date().toLocaleTimeString(),
-      },
-    ]);
-  };
-
-  const handleSetupRecurring = () => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        sender: 'kivo',
-        text: 'Recurring trust scheduled for "Digital Nomad Coffee". Next auto-execution set for 7 days.',
-        timestamp: new Date().toLocaleTimeString(),
-      },
-    ]);
-  };
-
   return (
     <div className="relative min-h-screen bg-[#0f141a] text-[#dee2ec] selection:bg-[#fcc82c]/30 selection:text-[#fcc82c] overflow-x-hidden font-sans">
-      {/* Background GLSL WebGL Shader */}
       <ShaderBackground />
 
-      {/* Header Bar */}
       <Header
         onSearchQuery={(q) => handleUserMessage(q)}
         onOpenProfile={() => setActiveTab('profile')}
       />
 
-      {/* Side Rail Navigation */}
-      <SideRail activeTab={activeTab} setActiveTab={setActiveTab} />
+      {activeTab !== 'checkout' && (
+        <SideRail activeTab={activeTab as any} setActiveTab={(t) => setActiveTab(t as any)} />
+      )}
 
-      {/* Main Content Workspace */}
-      <main className="relative z-10 pt-20 px-4 md:px-6 max-w-4xl mx-auto min-h-screen flex flex-col items-center">
+      <main className="relative z-10 pt-20 px-4 md:px-6 max-w-5xl mx-auto min-h-screen flex flex-col items-center">
         {activeTab === 'assistant' && (
           <div className="w-full">
             <ChatOverlay
               messages={messages}
               transactions={transactions}
-              onTriggerSendModal={() => setActiveTab('wallet')}
+              onTriggerSendModal={() => setActiveTab('checkout')}
               onOpenTab={(tab) => setActiveTab(tab as any)}
-              onCategorizeExpense={handleCategorizeExpense}
-              onSetupRecurring={handleSetupRecurring}
+              onCategorizeExpense={() => {
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: Date.now().toString(),
+                    sender: 'kivo',
+                    text: 'Expense categorized as Coffee & Daily Expense.',
+                    timestamp: new Date().toLocaleTimeString(),
+                  },
+                ]);
+              }}
+              onSetupRecurring={() => {
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: Date.now().toString(),
+                    sender: 'kivo',
+                    text: 'Recurring trust rule set for 50 NIM weekly.',
+                    timestamp: new Date().toLocaleTimeString(),
+                  },
+                ]);
+              }}
             />
 
             <AssistantShell
               onSendMessage={handleUserMessage}
               onOpenQRScanner={() => setShowQRScanner(true)}
+            />
+          </div>
+        )}
+
+        {activeTab === 'checkout' && (
+          <div className="w-full">
+            <SendPaymentCheckout
+              recipientName={checkoutData.recipient}
+              amount={checkoutData.amount}
+              currency={checkoutData.currency}
+              onBack={() => setActiveTab('assistant')}
+              onConfirmSend={handleSendTx}
             />
           </div>
         )}
@@ -244,13 +253,12 @@ export function App() {
         )}
       </main>
 
-      {/* QR Scanner Modal */}
       {showQRScanner && (
         <QRScannerModal
           onClose={() => setShowQRScanner(false)}
           onScanResult={(addr) => {
-            setActiveTab('wallet');
-            handleUserMessage(`Scanned recipient address: ${addr}`);
+            setCheckoutData({ recipient: 'Scanned Address', amount: 25, currency: 'NIM' });
+            setActiveTab('checkout');
           }}
         />
       )}
