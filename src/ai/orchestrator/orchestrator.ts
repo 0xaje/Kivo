@@ -11,7 +11,6 @@ import {
 } from './types';
 import { LLMMessage } from '../types';
 import { SystemPromptDomain } from '../prompts';
-import { StreamController } from '../stream';
 
 export class AIOrchestrator implements IAIOrchestrator {
   constructor(private readonly deps: AIOrchestratorDependencies) {}
@@ -74,7 +73,6 @@ export class AIOrchestrator implements IAIOrchestrator {
     // STEP 4: TOOL SELECTION & OPENAI SCHEMA ASSEMBLY
     // Resolves matching tool definitions from ToolRegistry & exports OpenAI schemas.
     // =========================================================================
-    const availableTools = this.deps.toolRegistry.listTools();
     const openAiToolSchemas = this.deps.toolRegistry.exportOpenAISchemas();
 
     // =========================================================================
@@ -84,7 +82,7 @@ export class AIOrchestrator implements IAIOrchestrator {
     const activeProvider = this.deps.providerRegistry.getActiveProvider();
     const providerResponse = await activeProvider.chatWithTools({
       messages: messagesWithSystem,
-      tools: availableTools,
+      tools: openAiToolSchemas,
     });
 
     // =========================================================================

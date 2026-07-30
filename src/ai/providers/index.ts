@@ -4,6 +4,7 @@
  */
 
 export * from './types';
+export * from './env';
 export * from './base';
 export * from './openai.provider';
 export * from './gemini.provider';

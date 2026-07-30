@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { SideRail } from './components/SideRail';
 import { ShaderBackground } from './components/ShaderBackground';
@@ -12,6 +12,15 @@ import { QRScannerModal } from './components/QRScannerModal';
 import { SendPaymentCheckout } from './components/SendPaymentCheckout';
 import { Transaction, ChatMessage } from './types/kivo';
 
+// AI & Wallet Architecture Integration
+import { LocalConversationMemoryStore } from './ai/memory';
+import { IntentRouter } from './ai/router';
+import { PromptEngine } from './ai/prompts';
+import { ToolRegistry } from './ai/tools';
+import { ProviderRegistry, ProviderConfigManager, OpenAIProviderContract } from './ai/providers';
+import { AIOrchestrator } from './ai/orchestrator';
+import { NimiqWalletRepository, WalletService, WalletAdapter } from './wallet';
+
 type TabType = 'assistant' | 'wallet' | 'portfolio' | 'history' | 'profile' | 'checkout';
 
 export function App() {
@@ -22,6 +31,31 @@ export function App() {
     amount: 0,
     currency: 'ETH',
   });
+
+  const orchestratorRef = useRef<AIOrchestrator | null>(null);
+
+  if (!orchestratorRef.current) {
+    const memoryProvider = new LocalConversationMemoryStore();
+    const intentRouter = new IntentRouter();
+    const promptEngine = new PromptEngine();
+    const toolRegistry = new ToolRegistry();
+    const configMgr = new ProviderConfigManager();
+    const providerRegistry = new ProviderRegistry(configMgr);
+    providerRegistry.registerProvider(new OpenAIProviderContract(configMgr.getProviderConfig('openai')));
+
+    const walletRepo = new NimiqWalletRepository();
+    const walletService = new WalletService(walletRepo);
+    const walletAdapter = new WalletAdapter(walletService);
+
+    orchestratorRef.current = new AIOrchestrator({
+      memoryProvider,
+      intentRouter,
+      promptEngine,
+      toolRegistry,
+      providerRegistry,
+      walletAdapter,
+    });
+  }
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('kivo_transactions');
@@ -81,7 +115,7 @@ export function App() {
     return newTx;
   };
 
-  const handleUserMessage = (text: string) => {
+  const handleUserMessage = async (text: string) => {
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
@@ -91,31 +125,52 @@ export function App() {
 
     setMessages((prev) => [...prev, userMsg]);
 
-    const lower = text.toLowerCase();
-    if (lower.includes('balance') || lower.includes('show balance')) {
-      const total = transactions.reduce((acc, t) => (t.type === 'receive' ? acc + t.amount : acc - t.amount), 0);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          sender: 'kivo',
-          text: `Current calculated vault balance: ${total >= 0 ? total.toFixed(4) : '0.0000'} ETH.`,
-          timestamp: new Date().toLocaleTimeString(),
-          actionCard: 'balance_card',
+    try {
+      const result = await orchestratorRef.current!.processMessage({
+        userMessage: text,
+        context: {
+          sessionId: 'user-session',
+          timestamp: Date.now(),
         },
-      ]);
-    } else if (lower.includes('send') || lower.includes('pay') || lower.includes('transfer')) {
-      setCheckoutData({ recipient: '', amount: 0, currency: 'ETH' });
-      setActiveTab('checkout');
-    } else if (lower.includes('portfolio') || lower.includes('holdings')) {
-      setActiveTab('portfolio');
-    } else {
+      });
+
+      const intent = result.classifiedIntent;
+      const responseText = result.assistantResponse.content;
+
+      if (intent === 'CHECK_BALANCE') {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            sender: 'kivo',
+            text: responseText,
+            timestamp: new Date().toLocaleTimeString(),
+            actionCard: 'balance_card',
+          },
+        ]);
+      } else if (intent === 'SEND_PAYMENT' || intent === 'REQUEST_PAYMENT') {
+        setCheckoutData({ recipient: '', amount: 0, currency: 'NIM' });
+        setActiveTab('checkout');
+      } else if (intent === 'SHOW_PORTFOLIO') {
+        setActiveTab('portfolio');
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            sender: 'kivo',
+            text: responseText,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
+      }
+    } catch (err) {
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           sender: 'kivo',
-          text: `Logged instruction: "${text}". Ready for vault actions.`,
+          text: `Processed request: "${text}". System ready for vault actions.`,
           timestamp: new Date().toLocaleTimeString(),
         },
       ]);
@@ -193,9 +248,9 @@ export function App() {
       {showQRScanner && (
         <QRScannerModal
           onClose={() => setShowQRScanner(false)}
-          onScanResult={(addr) => {
-            setCheckoutData({ recipient: addr, amount: 0, currency: 'ETH' });
-            setActiveTab('checkout');
+          onScanResult={(val) => {
+            setShowQRScanner(false);
+            handleUserMessage(`Scanned QR payload: ${val}`);
           }}
         />
       )}

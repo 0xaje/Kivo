@@ -57,16 +57,19 @@ export interface LLMResponse {
 export interface LLMStreamChunk {
   id: string;
   delta: Partial<LLMMessage>;
+  deltaText?: string;
+  accumulatedText?: string;
+  isFinal?: boolean;
   finishReason?: string;
 }
 
 /**
- * Execution context for AI processing runs.
+ * AI Execution Context passed through the orchestrator.
  */
 export interface AIExecutionContext {
   sessionId: string;
   userId?: string;
+  vaultAddress?: string;
   timestamp: number;
-  activeChainId?: string;
   metadata?: Record<string, unknown>;
 }

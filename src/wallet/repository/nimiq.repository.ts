@@ -1,6 +1,6 @@
 /**
  * @file src/wallet/repository/nimiq.repository.ts
- * @description Production Nimiq Protocol Wallet Repository implementing IWalletRepository with @nimiq/hub-api enclave support.
+ * @description Production Nimiq Protocol Wallet Repository with Network Switcher (Mainnet / Testnet) and @nimiq/hub-api enclave support.
  */
 
 import HubApi, { CheckoutRequest } from '@nimiq/hub-api';
@@ -15,16 +15,26 @@ import {
   PaymentRequestDTO,
 } from '../types';
 import { NimiqUtils } from './nimiq.utils';
+import { getAIEnvConfig } from '../../ai/providers/env';
 
 export class NimiqWalletRepository extends AbstractWalletRepository {
-  private readonly nimiqApiBase = 'https://api.nimiq.watch';
+  private readonly nimiqApiBase: string;
   private hubApi: HubApi | null = null;
 
-  constructor(hubUrl: string = 'https://hub.nimiq.com') {
+  constructor(hubUrl?: string) {
     super();
+    const env = getAIEnvConfig();
+    const isTestnet = env.nimiqNetwork === 'testnet';
+
+    this.nimiqApiBase = isTestnet
+      ? 'https://api.testnet.nimiq.watch'
+      : 'https://api.nimiq.watch';
+
+    const resolvedHubUrl = hubUrl || (isTestnet ? 'https://hub.testnet.nimiq.com' : 'https://hub.nimiq.com');
+
     if (typeof window !== 'undefined') {
       try {
-        this.hubApi = new HubApi(hubUrl);
+        this.hubApi = new HubApi(resolvedHubUrl);
       } catch (e) {
         // Fallback gracefully if running in non-browser unit test environment
       }
