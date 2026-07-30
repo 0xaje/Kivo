@@ -13,3 +13,4 @@ export * from './memory';
 export * from './services';
 export * from './utils';
 export * from './assistant';
+export * from './stream';
