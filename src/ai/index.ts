@@ -16,3 +16,4 @@ export * from './assistant';
 export * from './stream';
 export * from './orchestrator';
 export * from './voice';
+export * from './renderers';
