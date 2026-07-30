@@ -23,7 +23,6 @@ export function App() {
     currency: 'ETH',
   });
 
-  // Pure state loaded from localStorage with no mock initial fallbacks
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('kivo_transactions');
     if (saved) {
@@ -36,7 +35,6 @@ export function App() {
     localStorage.setItem('kivo_transactions', JSON.stringify(transactions));
   }, [transactions]);
 
-  // Clean initial messages array loaded from localStorage
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = localStorage.getItem('kivo_chat_messages');
     if (saved) {
@@ -49,7 +47,6 @@ export function App() {
     localStorage.setItem('kivo_chat_messages', JSON.stringify(messages));
   }, [messages]);
 
-  // Real Web Crypto SHA-256 transaction signing execution
   const handleSendTx = async (recipient: string, amount: number, currency: string): Promise<Transaction> => {
     const payload = `${recipient}-${amount}-${currency}-${Date.now()}`;
     const encoder = new TextEncoder();

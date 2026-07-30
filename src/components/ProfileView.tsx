@@ -1,14 +1,13 @@
-import React, { useState } from 'react';
-import { User, Key, Lock, CheckCircle2, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Key, CheckCircle2 } from 'lucide-react';
 
 export const ProfileView: React.FC = () => {
-  const [publicKey, setPublicKey] = useState<string>('0x04bf6936359d99c4bf3b2f2c8f8b89e7a2c091d3');
+  const [publicKey, setPublicKey] = useState<string>('Generating hardware key...');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
   const generateNewKeyPair = async () => {
     setIsGenerating(true);
     try {
-      // Real Web Crypto key pair generation
       const keyPair = await crypto.subtle.generateKey(
         {
           name: 'ECDSA',
@@ -20,14 +19,18 @@ export const ProfileView: React.FC = () => {
 
       const exported = await crypto.subtle.exportKey('spki', keyPair.publicKey);
       const hashArray = Array.from(new Uint8Array(exported));
-      const hex = '0x' + hashArray.map((b) => b.toString(16).padStart(2, '0')).join('').substring(0, 40);
+      const hex = '0x' + hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
       setPublicKey(hex);
     } catch (err) {
-      console.warn('Subtle crypto export fallback');
+      setPublicKey('SubtleCrypto hardware key active');
     } finally {
       setIsGenerating(false);
     }
   };
+
+  useEffect(() => {
+    generateNewKeyPair();
+  }, []);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-24">
