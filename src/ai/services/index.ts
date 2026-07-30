@@ -45,3 +45,5 @@ export interface ISecurityGuardService {
   validateInput(input: string): Promise<SafetyAssessment>;
   validateOutput(message: LLMMessage): Promise<SafetyAssessment>;
 }
+
+export * from './speech';
