@@ -4,11 +4,15 @@ import { Transaction } from '../types/kivo';
 
 interface WalletViewProps {
   transactions: Transaction[];
+  walletAddress?: string;
   onSendTx: (recipient: string, amount: number, currency: string) => Promise<Transaction>;
 }
 
-export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }) => {
-  const walletAddress = '0x71C7656EC7ab88b098defB751B7401B5f6d8976F';
+export const WalletView: React.FC<WalletViewProps> = ({
+  transactions,
+  walletAddress = '',
+  onSendTx,
+}) => {
   const [copied, setCopied] = useState<boolean>(false);
   const [showSendModal, setShowSendModal] = useState<boolean>(false);
   const [recipient, setRecipient] = useState<string>('');
@@ -17,6 +21,7 @@ export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
   const handleCopy = () => {
+    if (!walletAddress) return;
     navigator.clipboard.writeText(walletAddress);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -39,7 +44,6 @@ export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }
     }
   };
 
-  // Compute balance dynamically from real transaction history ledger
   const totalEth = transactions.reduce((acc, t) => {
     if (t.type === 'receive') return acc + t.amount;
     if (t.type === 'send') return acc - t.amount;
@@ -75,16 +79,18 @@ export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }
         </div>
 
         {/* Address Identifier */}
-        <div className="flex items-center justify-between bg-slate-950/60 border border-white/5 rounded-xl p-3 text-xs font-mono">
-          <span className="text-slate-400 truncate max-w-[280px] sm:max-w-none">{walletAddress}</span>
-          <button
-            onClick={handleCopy}
-            className="text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
-          >
-            {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
-        </div>
+        {walletAddress && (
+          <div className="flex items-center justify-between bg-slate-950/60 border border-white/5 rounded-xl p-3 text-xs font-mono">
+            <span className="text-slate-400 truncate max-w-[280px] sm:max-w-none">{walletAddress}</span>
+            <button
+              onClick={handleCopy}
+              className="text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Transaction History Sub-Section */}
@@ -158,7 +164,7 @@ export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }
                   type="text"
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
-                  placeholder="0x... or ENS address"
+                  placeholder="Enter recipient address"
                   className="w-full bg-[#0f141a] border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono text-xs"
                   required
                 />
