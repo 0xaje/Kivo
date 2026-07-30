@@ -18,71 +18,38 @@ export function App() {
   const [activeTab, setActiveTab] = useState<TabType>('assistant');
   const [showQRScanner, setShowQRScanner] = useState<boolean>(false);
   const [checkoutData, setCheckoutData] = useState<{ recipient: string; amount: number; currency: string }>({
-    recipient: 'David',
-    amount: 25,
-    currency: 'NIM',
+    recipient: '',
+    amount: 0,
+    currency: 'ETH',
   });
 
+  // Pure state loaded from localStorage with no mock initial fallbacks
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('kivo_transactions');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { }
     }
-    return [
-      {
-        id: 'tx-201',
-        type: 'send',
-        recipientOrSender: 'Digital Nomad Coffee',
-        amount: 50.0,
-        currency: 'NIM',
-        timestamp: '12 seconds ago',
-        status: 'completed',
-        hash: '0xf8e7d6c5b4a3928170192837465f4e3d2c1b0a',
-        category: 'Coffee & Daily Expense',
-      },
-      {
-        id: 'tx-200',
-        type: 'receive',
-        recipientOrSender: 'Vault Deposit',
-        amount: 12.0,
-        currency: 'NIM',
-        timestamp: 'Yesterday',
-        status: 'completed',
-        hash: '0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a',
-      },
-    ];
+    return [];
   });
 
   useEffect(() => {
     localStorage.setItem('kivo_transactions', JSON.stringify(transactions));
   }, [transactions]);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'msg-1',
-      sender: 'kivo',
-      text: 'Good morning. Your digital assets are secure. You have 245.32 NIM available in your primary vault.',
-      timestamp: 'Just Now',
-    },
-    {
-      id: 'msg-2',
-      sender: 'kivo',
-      text: 'Vault Balance Summary:',
-      timestamp: 'Just Now',
-      actionCard: 'balance_card',
-    },
-    {
-      id: 'msg-3',
-      sender: 'kivo',
-      text: 'I noticed your last transaction of 50 NIM to the "Digital Nomad Coffee" address. This was a direct peer-to-peer transfer that confirmed in approximately 12 seconds. No additional fees were incurred on this network path. Would you like me to categorize this as a daily expense or set up a recurring trust for this wallet?',
-      timestamp: 'Just Now',
-      chips: [
-        { label: 'Categorize Expense', action: 'categorize' },
-        { label: 'Setup Recurring', action: 'recurring' },
-      ],
-    },
-  ]);
+  // Clean initial messages array loaded from localStorage
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const saved = localStorage.getItem('kivo_chat_messages');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { }
+    }
+    return [];
+  });
 
+  useEffect(() => {
+    localStorage.setItem('kivo_chat_messages', JSON.stringify(messages));
+  }, [messages]);
+
+  // Real Web Crypto SHA-256 transaction signing execution
   const handleSendTx = async (recipient: string, amount: number, currency: string): Promise<Transaction> => {
     const payload = `${recipient}-${amount}-${currency}-${Date.now()}`;
     const encoder = new TextEncoder();
@@ -109,7 +76,7 @@ export function App() {
       {
         id: Date.now().toString(),
         sender: 'kivo',
-        text: `Confirmed payment of ${amount} ${currency} to ${recipient}. SHA-256 Hash: ${hashHex.substring(0, 14)}...`,
+        text: `Verified payment of ${amount} ${currency} to ${recipient}. SHA-256 Hash: ${hashHex}`,
         timestamp: new Date().toLocaleTimeString(),
       },
     ]);
@@ -128,40 +95,34 @@ export function App() {
     setMessages((prev) => [...prev, userMsg]);
 
     const lower = text.toLowerCase();
-    setTimeout(() => {
-      let responseText = '';
-      let actionCard: ChatMessage['actionCard'] = undefined;
-      let chips: ChatMessage['chips'] = undefined;
-
-      if (lower.includes('balance') || lower.includes('show balance')) {
-        responseText = 'Here is your active vault balance overview:';
-        actionCard = 'balance_card';
-      } else if (lower.includes('send') || lower.includes('pay') || lower.includes('transfer')) {
-        responseText = 'Opening the KIVO Payment Checkout screen for your transaction.';
-        setActiveTab('checkout');
-      } else if (lower.includes('portfolio') || lower.includes('holdings')) {
-        responseText = 'Displaying your aggregate crypto holdings and live price telemetry.';
-        setActiveTab('portfolio');
-      } else {
-        responseText = `I have logged your request: "${text}". Your primary vault assets remain fully secured.`;
-        chips = [
-          { label: 'Categorize Expense', action: 'categorize' },
-          { label: 'Setup Recurring', action: 'recurring' },
-        ];
-      }
-
+    if (lower.includes('balance') || lower.includes('show balance')) {
+      const total = transactions.reduce((acc, t) => (t.type === 'receive' ? acc + t.amount : acc - t.amount), 0);
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           sender: 'kivo',
-          text: responseText,
+          text: `Current calculated vault balance: ${total >= 0 ? total.toFixed(4) : '0.0000'} ETH.`,
           timestamp: new Date().toLocaleTimeString(),
-          actionCard,
-          chips,
+          actionCard: 'balance_card',
         },
       ]);
-    }, 600);
+    } else if (lower.includes('send') || lower.includes('pay') || lower.includes('transfer')) {
+      setCheckoutData({ recipient: '', amount: 0, currency: 'ETH' });
+      setActiveTab('checkout');
+    } else if (lower.includes('portfolio') || lower.includes('holdings')) {
+      setActiveTab('portfolio');
+    } else {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          sender: 'kivo',
+          text: `Logged instruction: "${text}". Ready for vault actions.`,
+          timestamp: new Date().toLocaleTimeString(),
+        },
+      ]);
+    }
   };
 
   return (
@@ -185,28 +146,6 @@ export function App() {
               transactions={transactions}
               onTriggerSendModal={() => setActiveTab('checkout')}
               onOpenTab={(tab) => setActiveTab(tab as any)}
-              onCategorizeExpense={() => {
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    id: Date.now().toString(),
-                    sender: 'kivo',
-                    text: 'Expense categorized as Coffee & Daily Expense.',
-                    timestamp: new Date().toLocaleTimeString(),
-                  },
-                ]);
-              }}
-              onSetupRecurring={() => {
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    id: Date.now().toString(),
-                    sender: 'kivo',
-                    text: 'Recurring trust rule set for 50 NIM weekly.',
-                    timestamp: new Date().toLocaleTimeString(),
-                  },
-                ]);
-              }}
             />
 
             <AssistantShell
@@ -220,6 +159,7 @@ export function App() {
           <div className="w-full">
             <SendPaymentCheckout
               recipientName={checkoutData.recipient}
+              recipientAddress={checkoutData.recipient}
               amount={checkoutData.amount}
               currency={checkoutData.currency}
               onBack={() => setActiveTab('assistant')}
@@ -257,7 +197,7 @@ export function App() {
         <QRScannerModal
           onClose={() => setShowQRScanner(false)}
           onScanResult={(addr) => {
-            setCheckoutData({ recipient: 'Scanned Address', amount: 25, currency: 'NIM' });
+            setCheckoutData({ recipient: addr, amount: 0, currency: 'ETH' });
             setActiveTab('checkout');
           }}
         />

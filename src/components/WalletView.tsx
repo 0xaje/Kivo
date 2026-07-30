@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wallet, Send, Download, ArrowUpRight, ArrowDownLeft, ShieldCheck, Copy, CheckCircle2 } from 'lucide-react';
+import { Wallet, Send, ArrowUpRight, ArrowDownLeft, ShieldCheck, Copy, CheckCircle2 } from 'lucide-react';
 import { Transaction } from '../types/kivo';
 
 interface WalletViewProps {
@@ -39,8 +39,12 @@ export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }
     }
   };
 
-  // Calculate live total balance from transaction ledger base
-  const totalEth = 4.85 - transactions.filter(t => t.type === 'send').reduce((acc, t) => acc + t.amount, 0);
+  // Compute balance dynamically from real transaction history ledger
+  const totalEth = transactions.reduce((acc, t) => {
+    if (t.type === 'receive') return acc + t.amount;
+    if (t.type === 'send') return acc - t.amount;
+    return acc;
+  }, 0);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-24">
@@ -55,11 +59,8 @@ export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }
               Verified Wallet Vault
             </span>
             <h2 className="text-4xl font-bold text-white tracking-tight mt-1 font-mono">
-              {totalEth.toFixed(4)} <span className="text-amber-400 text-2xl font-sans">ETH</span>
+              {totalEth >= 0 ? totalEth.toFixed(4) : '0.0000'} <span className="text-amber-400 text-2xl font-sans">ETH</span>
             </h2>
-            <p className="text-slate-400 text-xs mt-1">
-              Estimated Value: ${(totalEth * 3450).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -90,49 +91,53 @@ export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }
       <div className="bg-[#1a1f26]/80 border border-white/10 rounded-2xl p-6 space-y-4">
         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
           <Wallet className="w-5 h-5 text-amber-400" />
-          Recent Cryptographic Ledger
+          Cryptographic Ledger
         </h3>
 
-        <div className="divide-y divide-white/5">
-          {transactions.map((tx) => (
-            <div key={tx.id} className="py-3.5 flex items-center justify-between text-sm">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                    tx.type === 'send'
-                      ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                      : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  }`}
-                >
-                  {tx.type === 'send' ? (
-                    <ArrowUpRight className="w-4 h-4" />
-                  ) : (
-                    <ArrowDownLeft className="w-4 h-4" />
-                  )}
-                </div>
-                <div>
-                  <div className="font-semibold text-white">
-                    {tx.type === 'send' ? 'Sent Payment' : 'Received Payment'}
+        {transactions.length === 0 ? (
+          <p className="text-xs text-slate-500 font-mono py-4">No ledger transactions recorded yet.</p>
+        ) : (
+          <div className="divide-y divide-white/5">
+            {transactions.map((tx) => (
+              <div key={tx.id} className="py-3.5 flex items-center justify-between text-sm">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                      tx.type === 'send'
+                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    }`}
+                  >
+                    {tx.type === 'send' ? (
+                      <ArrowUpRight className="w-4 h-4" />
+                    ) : (
+                      <ArrowDownLeft className="w-4 h-4" />
+                    )}
                   </div>
-                  <div className="text-xs text-slate-500 font-mono">{tx.timestamp}</div>
+                  <div>
+                    <div className="font-semibold text-white">
+                      {tx.type === 'send' ? 'Sent Payment' : 'Received Payment'}
+                    </div>
+                    <div className="text-xs text-slate-500 font-mono">{tx.timestamp}</div>
+                  </div>
                 </div>
-              </div>
 
-              <div className="text-right">
-                <div
-                  className={`font-mono font-bold ${
-                    tx.type === 'send' ? 'text-rose-400' : 'text-emerald-400'
-                  }`}
-                >
-                  {tx.type === 'send' ? '-' : '+'}{tx.amount} {tx.currency}
-                </div>
-                <div className="text-[10px] text-slate-500 font-mono truncate max-w-[120px]">
-                  {tx.hash.substring(0, 10)}...
+                <div className="text-right">
+                  <div
+                    className={`font-mono font-bold ${
+                      tx.type === 'send' ? 'text-rose-400' : 'text-emerald-400'
+                    }`}
+                  >
+                    {tx.type === 'send' ? '-' : '+'}{tx.amount} {tx.currency}
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-mono truncate max-w-[120px]">
+                    {tx.hash ? `${tx.hash.substring(0, 10)}...` : ''}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Send Payment Modal */}
@@ -147,13 +152,13 @@ export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }
             <form onSubmit={handleSend} className="space-y-4 text-sm">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Recipient Address or ENS
+                  Recipient Address
                 </label>
                 <input
                   type="text"
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
-                  placeholder="0x... or name.eth"
+                  placeholder="0x... or ENS address"
                   className="w-full bg-[#0f141a] border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono text-xs"
                   required
                 />
@@ -169,7 +174,7 @@ export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }
                     step="0.001"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.05"
+                    placeholder="0.00"
                     className="w-full bg-[#0f141a] border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono text-xs"
                     required
                   />
@@ -185,19 +190,8 @@ export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }
                   >
                     <option value="ETH">ETH</option>
                     <option value="USDC">USDC</option>
-                    <option value="WBTC">WBTC</option>
+                    <option value="NIM">NIM</option>
                   </select>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-950 border border-white/5 text-xs text-slate-400 space-y-1 font-mono">
-                <div className="flex justify-between">
-                  <span>Network Fee (Est.):</span>
-                  <span className="text-amber-400">0.0012 ETH</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Web Crypto Hash Signature:</span>
-                  <span className="text-slate-500">SHA-256 Enabled</span>
                 </div>
               </div>
 
@@ -214,7 +208,7 @@ export const WalletView: React.FC<WalletViewProps> = ({ transactions, onSendTx }
                   disabled={isProcessing}
                   className="px-5 py-2.5 rounded-xl bg-[#fcc82c] text-slate-950 font-semibold text-xs flex items-center gap-1.5 cursor-pointer hover:bg-amber-300"
                 >
-                  {isProcessing ? 'Signing Hash...' : 'Sign & Submit'}
+                  {isProcessing ? 'Signing...' : 'Sign & Submit'}
                 </button>
               </div>
             </form>

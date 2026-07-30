@@ -13,6 +13,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ onClose, onScanR
 
   useEffect(() => {
     let stream: MediaStream | null = null;
+    let animationFrameId: number;
 
     async function startCamera() {
       try {
@@ -21,8 +22,30 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ onClose, onScanR
         });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
+          await videoRef.current.play();
           setIsCameraActive(true);
+
+          // Native BarcodeDetector API check
+          if ('BarcodeDetector' in window) {
+            const barcodeDetector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+            const detectQR = async () => {
+              if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+                try {
+                  const barcodes = await barcodeDetector.detect(videoRef.current);
+                  if (barcodes.length > 0) {
+                    const rawValue = barcodes[0].rawValue;
+                    if (rawValue) {
+                      onScanResult(rawValue);
+                      onClose();
+                      return;
+                    }
+                  }
+                } catch (e) {}
+              }
+              animationFrameId = requestAnimationFrame(detectQR);
+            };
+            animationFrameId = requestAnimationFrame(detectQR);
+          }
         }
       } catch (err: any) {
         setErrorMsg('Camera access denied or unreadable on this device.');
@@ -32,16 +55,12 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ onClose, onScanR
     startCamera();
 
     return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, []);
-
-  const handleSimulatedScan = () => {
-    onScanResult('0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5');
-    onClose();
-  };
+  }, [onClose, onScanResult]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
@@ -61,12 +80,6 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ onClose, onScanR
             <div className="p-6 text-center space-y-2">
               <AlertCircle className="w-10 h-10 text-rose-400 mx-auto" />
               <p className="text-xs text-rose-300">{errorMsg}</p>
-              <button
-                onClick={handleSimulatedScan}
-                className="mt-3 px-4 py-2 rounded-xl bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-semibold cursor-pointer"
-              >
-                Use Verified Test Address (0x952...afe5)
-              </button>
             </div>
           ) : (
             <>
@@ -77,18 +90,10 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ onClose, onScanR
         </div>
 
         {isCameraActive && (
-          <div className="text-center space-y-2">
-            <p className="text-xs text-slate-400 flex items-center justify-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-[#fcc82c]" />
-              Align QR Code inside frame
-            </p>
-            <button
-              onClick={handleSimulatedScan}
-              className="text-xs text-amber-400 hover:underline cursor-pointer font-mono"
-            >
-              Or click to auto-select detected target (0x952...afe5)
-            </button>
-          </div>
+          <p className="text-xs text-slate-400 flex items-center justify-center gap-1.5 text-center">
+            <Camera className="w-3.5 h-3.5 text-[#fcc82c]" />
+            Align QR Code inside frame for instant detection
+          </p>
         )}
       </div>
     </div>

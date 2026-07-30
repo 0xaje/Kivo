@@ -3,32 +3,33 @@ import { ArrowLeft, CheckCircle2, ArrowRight, ShieldCheck, Sparkles, RefreshCw }
 import { Transaction } from '../types/kivo';
 
 interface SendPaymentCheckoutProps {
-  recipientName?: string;
-  recipientAddress?: string;
-  amount?: number;
-  currency?: string;
+  recipientName: string;
+  recipientAddress: string;
+  amount: number;
+  currency: string;
   onBack: () => void;
   onConfirmSend: (recipient: string, amount: number, currency: string) => Promise<Transaction>;
 }
 
 export const SendPaymentCheckout: React.FC<SendPaymentCheckoutProps> = ({
-  recipientName = 'David',
-  recipientAddress = 'NQ54 1A2B 3C4D 5E6F 7G8H 9I0J 1K2L',
-  amount = 25,
-  currency = 'NIM',
+  recipientName,
+  recipientAddress,
+  amount,
+  currency,
   onBack,
   onConfirmSend,
 }) => {
   const [status, setStatus] = useState<'idle' | 'processing' | 'success'>('idle');
 
   const handleConfirm = async () => {
+    if (!recipientAddress || amount <= 0) return;
     setStatus('processing');
     try {
-      await onConfirmSend(recipientName, amount, currency);
+      await onConfirmSend(recipientName || recipientAddress, amount, currency);
       setStatus('success');
       setTimeout(() => {
         onBack();
-      }, 2000);
+      }, 1500);
     } catch (err) {
       setStatus('idle');
     }
@@ -46,17 +47,17 @@ export const SendPaymentCheckout: React.FC<SendPaymentCheckoutProps> = ({
           Back
         </button>
         <span className="text-xs uppercase tracking-widest text-[#fcc82c] font-semibold font-mono">
-          Secure Payment Checkout
+          Payment Checkout
         </span>
       </div>
 
       {/* Recipient Card */}
       <div className="w-full bg-[#1a1f26]/80 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 flex items-center gap-4 mb-6 shadow-2xl">
         <div className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-[#fcc82c]/40 shrink-0 bg-slate-900 flex items-center justify-center text-[#fcc82c] font-bold text-lg font-mono">
-          {recipientName.charAt(0)}
+          {recipientName ? recipientName.charAt(0).toUpperCase() : '0x'}
         </div>
         <div className="flex flex-col overflow-hidden">
-          <h2 className="text-xl font-bold text-white">{recipientName}</h2>
+          <h2 className="text-xl font-bold text-white">{recipientName || 'Recipient Address'}</h2>
           <p className="text-xs font-mono text-slate-400 truncate max-w-[240px] sm:max-w-none">
             {recipientAddress}
           </p>
@@ -74,9 +75,6 @@ export const SendPaymentCheckout: React.FC<SendPaymentCheckoutProps> = ({
           </span>
           <span className="text-2xl font-bold text-[#fcc82c]">{currency}</span>
         </div>
-        <span className="text-xs font-mono text-slate-400">
-          ≈ ${(amount * 0.0568).toFixed(2)} USD
-        </span>
       </div>
 
       {/* AI Explanation Block */}
@@ -87,10 +85,10 @@ export const SendPaymentCheckout: React.FC<SendPaymentCheckoutProps> = ({
           </div>
           <div className="flex flex-col gap-1 text-xs">
             <p className="text-slate-200">
-              You are sending <strong className="text-[#fcc82c]">{amount} {currency}</strong> to {recipientName}.
+              Sending <strong className="text-[#fcc82c]">{amount} {currency}</strong> to {recipientName || recipientAddress}.
             </p>
             <p className="text-slate-400 italic">
-              The network fee is minimal (~0.01 NIM). SHA-256 Web Crypto signature will finalize in ~1 second.
+              Web Crypto SHA-256 payload signature will be recorded to ledger.
             </p>
           </div>
         </div>
